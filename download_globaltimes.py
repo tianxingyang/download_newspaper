@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 import datetime
 import os
+import random
 import re
 import requests
 import shutil
+import time
 
 host_link = "https://www.hqck.net"
 base_location = "/home/vitoyang/test/global_times/"
@@ -24,7 +26,7 @@ def download_and_save(link, suffix_num):
         print(file_name + "已下载，跳过")
         return
     download_link = search_download_link(link)
-    if download_link == None:
+    if download_link is None:
         return
     print("downloading from " + download_link)
     image_response = requests.get(download_link, headers=my_headers)
@@ -68,7 +70,7 @@ def main():
     print("最新的报纸日期是: " + newest_paper_date.group())
     print("今天的日期是: " + str(datetime.date.today()))
     print('是否继续 \033[4m%s\033[0mes Or \033[4m%s\033[0mo' % ('Y', 'N'))
-    if control() is False:
+    if not control():
         return
 
     if os.path.exists(base_location + str(datetime.date.today()) + ".pdf"):
@@ -88,12 +90,13 @@ def main():
     download_and_save(big_link, 1)
 
     for i in range(2, 17):
+        time.sleep(random.random())
         suffix = "_" + str(i) + ".html"
         tmp_link = re.sub("\.html", suffix, big_link)
         # print(tmp_link)
         download_and_save(tmp_link, i)
 
-    # # 将所有图片转为pdf
+    # 将所有图片转为pdf
     convert_cmd = "convert " + base_location + "tmp/" + \
         "*.jpg " + base_location + "`date +%Y-%m-%d`.pdf"
     # print(convert_cmd)
