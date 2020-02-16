@@ -9,8 +9,10 @@ import shutil
 import time
 
 host_link = "https://www.hqck.net"
-base_location = "/tmp/"
-target_location = "/mnt/ossfs/cloud/vitoyang/files/Documents/Global Times"
+base_location = "/tmp/gt_download/"
+target_location = "/mnt/ossfs/cloud/vitoyang/files/Documents/GlobalTimes/"
+refresh_target = "/vitoyang/files/Documents/GlobalTimes"
+occ_path = "/var/www/nextcloud/occ"
 my_headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.87 Safari/537.36 Edg/80.0.361.50"
 }
@@ -24,7 +26,7 @@ def download_and_save(link, suffix_num):
     else:
         file_name_suffix = str(suffix_num) + ".jpg"
     file_name = str(datetime.date.today()) + "-" + file_name_suffix
-    if os.path.exists(base_location + "gt_download/" + file_name):
+    if os.path.exists(base_location + "tmp/" + file_name):
         print(file_name + "已下载，跳过")
         return
     download_link = search_download_link(link)
@@ -32,7 +34,7 @@ def download_and_save(link, suffix_num):
         return
     print("downloading from " + download_link)
     image_response = requests.get(download_link, headers=my_headers)
-    sz = open(base_location + "gt_download/" + file_name, "wb").write(image_response.content)
+    sz = open(base_location + "tmp/" + file_name, "wb").write(image_response.content)
     print("saving " + file_name)
 
 
@@ -75,13 +77,13 @@ def main():
     if not control():
         return
 
-    if os.path.exists(base_location + str(datetime.date.today()) + ".pdf"):
+    if os.path.exists(target_location + str(datetime.date.today()) + ".pdf"):
         print("今日报纸已经下载")
         print('是否重新下载 \033[4m%s\033[0mes Or \033[4m%s\033[0mo' % ('Y', 'N'))
         if not control():
             return
         else:
-            os.remove(base_location + str(datetime.date.today()) + ".pdf")
+            os.remove(target_location + str(datetime.date.today()) + ".pdf")
 
     if not os.path.exists(base_location + "tmp"):
         os.mkdir(base_location + "tmp")
@@ -99,14 +101,18 @@ def main():
         download_and_save(tmp_link, i)
 
     # 将所有图片转为 pdf
-    convert_cmd = "convert " + base_location + "gt_download/" + \
+    convert_cmd = "convert " + base_location + "tmp/" + \
         "*.jpg " + target_location + "`date +%Y-%m-%d`.pdf"
     # print(convert_cmd)
     print("converting jpeg to pdf")
     os.system(convert_cmd)
     # 删除图片缓存
-    shutil.rmtree(base_location + "gt_download/tmp")
+    shutil.rmtree(base_location + "tmp")
     print("tmp files has been deleted")
+    # 刷新 nextcloud 缓存
+    refresh_cmd = "sudo -u www-data php " + occ_path + " files:scan --path=" + refresh_target
+    print(refresh_cmd)
+    os.system(refresh_cmd)
 
 
 if __name__ == "__main__":
