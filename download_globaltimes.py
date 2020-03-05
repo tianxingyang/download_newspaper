@@ -32,6 +32,7 @@ def serverchan_send(text="", desp=""):
     }
     rsp = requests.post(serverchan["addr"], d)
 
+
 def read_config():
     if not os.path.exists("config.json"):
         print("config.json not exist")
@@ -128,7 +129,8 @@ def do_download():
 
         if os.path.exists(config['target_location'] + "环球时报-" + date_of_today + ".pdf"):
             print("今日报纸已经下载")
-            print('是否重新下载 \033[4m%s\033[0mes Or \033[4m%s\033[0mo' % ('Y', 'N'))
+            print(
+                '是否重新下载 \033[4m%s\033[0mes Or \033[4m%s\033[0mo' % ('Y', 'N'))
             if not control():
                 return
             else:
@@ -136,7 +138,8 @@ def do_download():
     else:
         # release 模式默认覆盖已下载的当日报纸
         if os.path.exists(config['target_location'] + "环球时报-" + date_of_today + ".pdf"):
-            os.remove(config['target_location'] + "环球时报-" + date_of_today + ".pdf")
+            os.remove(config['target_location'] +
+                      "环球时报-" + date_of_today + ".pdf")
 
     link = re.search(
         "/arc/jwbt/hqsb/\d{4}/\d{4}/\d*.html", response.text)
@@ -170,8 +173,9 @@ def do_download():
     # refresh_cmd = "sudo -u www-data php " + config['occ_path'] + \
     #     " files:scan --path=" + config['refresh_target']
     # print(refresh_cmd)
-    refresh_cmd = ['sudo', '-u', 'www-data', 'php', config['occ_path'], 'files:scan', '--path=%s'%config['refresh_target']]
-    p = subprocess.run(refresh_cmd,stdout=open("out", "a"))
+    refresh_cmd = ['sudo', '-u', 'www-data', 'php', config['occ_path'],
+                   'files:scan', '--path=%s' % config['refresh_target']]
+    p = subprocess.run(refresh_cmd, stdout=open("out", "a"))
     # os.system(refresh_cmd)
     global last_download_date
     last_download_date = datetime.datetime.today().date()
@@ -189,7 +193,7 @@ def main():
             print(datetime.datetime.today())
             do_download()
 
-        time.sleep(10)
+        time.sleep(5*60)
 
 
 if __name__ == "__main__":
