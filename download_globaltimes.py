@@ -34,6 +34,7 @@ def serverchan_send(text="", desp=""):
 
 
 def read_config():
+    # 从 config.json 中读取基本的配置
     if not os.path.exists("config.json"):
         print("config.json not exist")
         return False
@@ -42,6 +43,7 @@ def read_config():
             global config
             config = json.load(f)
 
+    # 如果有 server 酱的配置，则导入配置
     if os.path.exists("serverchan.json"):
         with open("serverchan.json") as f:
             global serverchan
@@ -112,6 +114,7 @@ def do_download():
         serverchan_send("报纸日期无法获取", "报纸供应商出现问题，脚本退出")
         sys.exit(0)
         return
+    # 网站上最新一期报纸不是今天的，返回
     if newest_paper_date.group() != date_of_today:
         return
 
@@ -150,6 +153,7 @@ def do_download():
     big_link = config['host_link'] + link.group()
     download_and_save(big_link, 1)
 
+    # 周六只有8版
     pages = 8 if datetime.datetime.today().weekday() == 5 else 16
     for i in range(2, pages + 1):
         time.sleep(random.random())
@@ -164,35 +168,31 @@ def do_download():
         "环球时报-" + date_of_today + ".pdf"
     # print(convert_cmd)
     print("converting jpeg to pdf")
-    # p = subprocess.run(convert_cmd)
     os.system(convert_cmd)
     # 删除图片缓存
     shutil.rmtree(config['base_location'] + "tmp")
     print("tmp files has been deleted")
     # 刷新 nextcloud 缓存
-    # refresh_cmd = "sudo -u www-data php " + config['occ_path'] + \
-    #     " files:scan --path=" + config['refresh_target']
-    # print(refresh_cmd)
     refresh_cmd = ['sudo', '-u', 'www-data', 'php', config['occ_path'],
                    'files:scan', '--path=%s' % config['refresh_target']]
     p = subprocess.run(refresh_cmd, stdout=open("out", "a"))
     # os.system(refresh_cmd)
     global last_download_date
     last_download_date = datetime.datetime.today().date()
-    serverchan_send("报纸下载成功，请查收")
+    serverchan_send("报纸下载成功，请查收", "wenmiaomiao.cn")
 
 
 def main():
     global last_download_date
     while True:
+        # 周日放假
         if datetime.datetime.today().weekday() == 6:
             time.sleep(24*60*60)
 
         if time.localtime()[3] >= config['start_time'] and last_download_date != datetime.datetime.today().date():
-            print(last_download_date)
-            print(datetime.datetime.today())
             do_download()
 
+        # 休息5min
         time.sleep(5*60)
 
 
@@ -215,9 +215,11 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if not read_config():
+        print("read config fail")
         sys.exit(0)
 
     if not debug:
+        # 父进程 fork 出子进程，并退出
         try:
             pid = os.fork()
             if pid != 0:
@@ -227,9 +229,12 @@ if __name__ == "__main__":
                              (e.errno, e.strerror))
             sys.exit(1)
 
+        # 创建新会话
         os.setsid()
+        # 清空用户掩码
         os.umask(0)
 
+        # 再次 fork 出子进程，避免上一个子进程控制终端
         try:
             pid = os.fork()
             if pid != 0:
@@ -239,6 +244,7 @@ if __name__ == "__main__":
                              (e.errno, e.strerror))
             sys.exit(1)
 
+        # 重定向输出
         sys.stdout.flush()
         sys.stderr.flush()
         sys.stdout = open("out", "w")
