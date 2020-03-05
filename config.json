@@ -1,0 +1,8 @@
+{
+    "host_link": "https://www.hqck.net",
+    "base_location": "/home/vyang/tmp/gt_download/",
+    "target_location": "/var/www/html/nextcloud/data/vitoyang/files/Documents/GlobalTimes/",
+    "refresh_target": "/vitoyang/files/Documents/GlobalTimes",
+    "occ_path": "/var/www/html/nextcloud/occ",
+    "start_time": 8
+}
