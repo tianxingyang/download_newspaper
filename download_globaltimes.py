@@ -1,7 +1,8 @@
-#!/usr/bin/python3
+#!/usr/local/bin/python3
 # -*- coding: utf-8 -*-
 import datetime
 import json
+import logging
 import os
 import random
 import re
@@ -18,8 +19,54 @@ my_headers = {
 config = {}
 serverchan = {}
 has_serverchan = False
-date_of_today = str(datetime.datetime.today().date())
 last_download_date = datetime.date.fromtimestamp(0)
+
+
+class Logger():
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            formatter = logging.Formatter(
+                '%(asctime)s %(filename)s[line:%(lineno)d] %(message)s')
+            # 初始化 info logger
+            cls._info_logger = logging.getLogger("info_logger")
+            cls._info_logger.setLevel(logging.INFO)
+            fh_info = logging.FileHandler("info.log")
+            fh_info.setLevel(logging.INFO)
+            fh_info.setFormatter(formatter)
+            cls._info_logger.addHandler(fh_info)
+
+            # 初始化 debug logger
+            cls._debug_logger = logging.getLogger("debug_logger")
+            cls._debug_logger.setLevel(logging.DEBUG)
+            fh_debug = logging.FileHandler("debug.log")
+            fh_debug.setLevel(logging.DEBUG)
+            fh_debug.setFormatter(formatter)
+            cls._debug_logger.addHandler(fh_debug)
+
+            # 初始化 error logger
+            cls._error_logger = logging.getLogger("error_logger")
+            cls._error_logger.setLevel(logging.ERROR)
+            fh_error = logging.FileHandler("error.log")
+            fh_error.setLevel(logging.ERROR)
+            fh_error.setFormatter(formatter)
+            cls._error_logger.addHandler(fh_error)
+
+        return cls._instance
+
+
+def log_run(info):
+    Logger()._info_logger.info(info)
+
+
+def log_debug(info):
+    Logger()._debug_logger.debug(info)
+
+
+def log_error(info):
+    Logger()._error_logger.error(info)
 
 
 def serverchan_send(text="", desp=""):
@@ -36,7 +83,7 @@ def serverchan_send(text="", desp=""):
 def read_config():
     # 从 config.json 中读取基本的配置
     if not os.path.exists("config.json"):
-        print("config.json not exist")
+        log_error("config.json not exist")
         return False
     else:
         with open("config.json") as f:
@@ -60,18 +107,18 @@ def download_and_save(link, suffix_num):
         file_name_suffix = "0" + str(suffix_num) + ".jpg"
     else:
         file_name_suffix = str(suffix_num) + ".jpg"
-    file_name = date_of_today + "-" + file_name_suffix
+    file_name = str(datetime.datetime.today().date()) + "-" + file_name_suffix
     if os.path.exists(config['base_location'] + "tmp/" + file_name):
-        print(file_name + "已下载，跳过")
+        log_run("%s已下载，跳过" % file_name)
         return
     download_link = search_download_link(link)
     if download_link is None:
         return
-    print("downloading from " + download_link)
+    log_run("downloading from %s" % download_link)
     image_response = requests.get(download_link, headers=my_headers)
     sz = open(config['base_location'] + "tmp/" + file_name,
               "wb").write(image_response.content)
-    print("saving " + file_name)
+    log_run("saving %s" % file_name)
 
 
 def search_download_link(link):
@@ -80,11 +127,18 @@ def search_download_link(link):
         "环球时报电子版在线阅读 .*\" src=\"http://.*.jpg\"", tmp_response.content.decode("GB18030"))
     if download_link is None:
         serverchan_send("查找图片下载地址失败", "脚本退出")
+        log_error("查找图片下载地址失败")
+        log_debug("tmp_response.content:{%s}" % tmp_response.content)
+        log_debug("link:{%s}" % link)
         sys.exit(0)
         return None
+    debug_tmp = download_link.group()
     download_link = re.search("http://.*.jpg", download_link.group())
     if download_link is None:
         serverchan_send("查找图片下载地址失败", "脚本退出")
+        log_error("查找图片下载地址失败")
+        log_debug("after first search:{%s}" % debug_tmp)
+        log_debug("link:{%s}" % link)
         sys.exit(0)
         return None
     return download_link.group()
@@ -105,7 +159,6 @@ def control():
 def do_download():
     response = requests.get(
         config['host_link'] + "/hqsb.html", headers=my_headers)
-    global date_of_today
     # 这神奇的编码格式，折腾了半天，开始还以为是gb2312呢……
     # print(response.content.decode('GB18030'))
 
@@ -115,7 +168,7 @@ def do_download():
         sys.exit(0)
         return
     # 网站上最新一期报纸不是今天的，返回
-    if newest_paper_date.group() != date_of_today:
+    if newest_paper_date.group() != str(datetime.datetime.today().date()):
         return
 
     if not os.path.exists(config['base_location'] + "tmp"):
@@ -124,7 +177,7 @@ def do_download():
     global debug
     if debug:
         print("最新的报纸日期是: " + newest_paper_date.group())
-        print("今天的日期是: " + date_of_today)
+        print("今天的日期是: " + str(datetime.datetime.today().date()))
         date_of_today = newest_paper_date.group()
         print('是否继续 \033[4m%s\033[0mes Or \033[4m%s\033[0mo' % ('Y', 'N'))
         if not control():
@@ -140,14 +193,16 @@ def do_download():
                 os.remove(config['target_location'] + date_of_today + ".pdf")
     else:
         # release 模式默认覆盖已下载的当日报纸
-        if os.path.exists(config['target_location'] + "环球时报-" + date_of_today + ".pdf"):
+        if os.path.exists(config['target_location'] + "环球时报-" + str(datetime.datetime.today().date()) + ".pdf"):
             os.remove(config['target_location'] +
-                      "环球时报-" + date_of_today + ".pdf")
+                      "环球时报-" + str(datetime.datetime.today().date()) + ".pdf")
 
     link = re.search(
         "/arc/jwbt/hqsb/\d{4}/\d{4}/\d*.html", response.text)
     if link is None:
         serverchan_send("首版查找失败", "脚本退出")
+        log_error("首版查找失败")
+        log_debug("response.text:{%s}" % response.text)
         sys.exit(0)
         return
     big_link = config['host_link'] + link.group()
@@ -165,17 +220,16 @@ def do_download():
     # 将所有图片转为 pdf
     convert_cmd = "sudo -u www-data convert " + config['base_location'] + "tmp/" + \
         "*.jpg " + config['target_location'] + \
-        "环球时报-" + date_of_today + ".pdf"
-    # print(convert_cmd)
-    print("converting jpeg to pdf")
+        "环球时报-" + str(datetime.datetime.today().date()) + ".pdf"
+    log_run("converting jpeg to pdf")
     os.system(convert_cmd)
     # 删除图片缓存
     shutil.rmtree(config['base_location'] + "tmp")
-    print("tmp files has been deleted")
+    log_run("tmp files has been deleted")
     # 刷新 nextcloud 缓存
     refresh_cmd = ['sudo', '-u', 'www-data', 'php', config['occ_path'],
                    'files:scan', '--path=%s' % config['refresh_target']]
-    p = subprocess.run(refresh_cmd, stdout=open("out", "a"))
+    p = subprocess.run(refresh_cmd, stdout=open(os.devnull, "w"))
     # os.system(refresh_cmd)
     global last_download_date
     last_download_date = datetime.datetime.today().date()
@@ -183,7 +237,6 @@ def do_download():
 
 
 def main():
-    global last_download_date
     while True:
         # 周日放假
         if datetime.datetime.today().weekday() == 6:
@@ -247,7 +300,5 @@ if __name__ == "__main__":
         # 重定向输出
         sys.stdout.flush()
         sys.stderr.flush()
-        sys.stdout = open("out", "w")
-        sys.stderr = open("err", "w")
 
     main()
