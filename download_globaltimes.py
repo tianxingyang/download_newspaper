@@ -206,6 +206,14 @@ def do_download():
         sys.exit(0)
         return
     big_link = config['host_link'] + link.group()
+
+    # 判断内容是否发布
+    # 存在仅更新一个页面，没有具体内容的情况
+    tmp_rsp = requests.get(big_link, headers=my_headers)
+    if re.search("<img atl=\"环球时报电子版在线阅读\"", tmp_rsp.content.decode("GB18030")) is None:
+        log_run("今日报纸内容未发布，仅发布一个空页面")
+        return
+
     download_and_save(big_link, 1)
 
     # 周六只有8版
