@@ -12,6 +12,10 @@ import subprocess
 import sys
 import time
 
+from logging_wrapper import log_debug
+from logging_wrapper import log_info
+from logging_wrapper import log_error
+
 my_headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.87 Safari/537.36 Edg/80.0.361.50"
 }
@@ -20,92 +24,6 @@ config = {}
 serverchan = {}
 has_serverchan = False
 last_download_date = datetime.date.fromtimestamp(0)
-
-
-class LoggerWrapper(logging.Logger):
-    def __init__(self, name, level):
-        super().__init__(name, level)
-
-    def findCaller(self, stack_info=False, stacklevel=1):
-        """
-        Find the stack frame of the caller so that we can note the source
-        file name, line number and function name.
-        """
-        f = logging.currentframe()
-        # On some versions of IronPython, currentframe() returns None if
-        # IronPython isn't run with -X:Frames.
-        if f is not None:
-            # 这里多找一次，因为代码中对 logging 做了一次封装
-            f = f.f_back.f_back
-        orig_f = f
-        while f and stacklevel > 1:
-            f = f.f_back
-            stacklevel -= 1
-        if not f:
-            f = orig_f
-        rv = "(unknown file)", 0, "(unknown function)", None
-        while hasattr(f, "f_code"):
-            co = f.f_code
-            filename = os.path.normcase(co.co_filename)
-            if filename == logging._srcfile:
-                f = f.f_back
-                continue
-            sinfo = None
-            if stack_info:
-                sio = io.StringIO()
-                sio.write('Stack (most recent call last):\n')
-                traceback.print_stack(f, file=sio)
-                sinfo = sio.getvalue()
-                if sinfo[-1] == '\n':
-                    sinfo = sinfo[:-1]
-                sio.close()
-            rv = (co.co_filename, f.f_lineno, co.co_name, sinfo)
-            break
-        return rv
-
-
-class LoggingWrapper():
-    _instance = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            formatter = logging.Formatter(
-                '%(asctime)s %(filename)s[line:%(lineno)d] %(message)s')
-            # 初始化 info logger
-            cls._info_logger = LoggerWrapper("info_log", logging.INFO)
-            fh_info = logging.FileHandler("info.log")
-            fh_info.setLevel(logging.INFO)
-            fh_info.setFormatter(formatter)
-            cls._info_logger.addHandler(fh_info)
-
-            # 初始化 debug logger
-            cls._debug_logger = LoggerWrapper("debug_log", logging.DEBUG)
-            fh_debug = logging.FileHandler("debug.log")
-            fh_debug.setLevel(logging.DEBUG)
-            fh_debug.setFormatter(formatter)
-            cls._debug_logger.addHandler(fh_debug)
-
-            # 初始化 error logger
-            cls._error_logger = LoggerWrapper("error_log", logging.ERROR)
-            fh_error = logging.FileHandler("error.log")
-            fh_error.setLevel(logging.ERROR)
-            fh_error.setFormatter(formatter)
-            cls._error_logger.addHandler(fh_error)
-
-        return cls._instance
-
-
-def log_run(log_content):
-    LoggingWrapper()._info_logger.info(log_content)
-
-
-def log_debug(log_content):
-    LoggingWrapper()._debug_logger.debug(log_content)
-
-
-def log_error(log_content):
-    LoggingWrapper()._error_logger.error(log_content)
 
 
 def serverchan_send(text="", desp=""):
@@ -148,16 +66,16 @@ def download_and_save(link, suffix_num):
         file_name_suffix = str(suffix_num) + ".jpg"
     file_name = str(datetime.datetime.today().date()) + "-" + file_name_suffix
     if os.path.exists(config['base_location'] + "tmp/" + file_name):
-        log_run("%s已下载，跳过" % file_name)
+        log_info("%s已下载，跳过" % file_name)
         return
     download_link = search_download_link(link)
     if download_link is None:
         return
-    log_run("downloading from %s" % download_link)
+    log_info("downloading from %s" % download_link)
     image_response = requests.get(download_link, headers=my_headers)
     sz = open(config['base_location'] + "tmp/" + file_name,
               "wb").write(image_response.content)
-    log_run("saving %s" % file_name)
+    log_info("saving %s" % file_name)
 
 
 def search_download_link(link):
@@ -251,7 +169,7 @@ def do_download():
     tmp_rsp = requests.get(big_link, headers=my_headers)
     log_debug(tmp_rsp.content)
     if re.search("共\d*页", tmp_rsp.content.decode("GB18030")) is None:
-        log_run("今日报纸内容未发布，仅发布一个空页面")
+        log_info("今日报纸内容未发布，仅发布一个空页面")
         return
 
     download_and_save(big_link, 1)
@@ -269,11 +187,11 @@ def do_download():
     convert_cmd = "sudo -u www-data convert " + config['base_location'] + "tmp/" + \
         "*.jpg " + config['target_location'] + \
         "环球时报-" + str(datetime.datetime.today().date()) + ".pdf"
-    log_run("converting jpeg to pdf")
+    log_info("converting jpeg to pdf")
     os.system(convert_cmd)
     # 删除图片缓存
     shutil.rmtree(config['base_location'] + "tmp")
-    log_run("tmp files has been deleted")
+    log_info("tmp files has been deleted")
     # 刷新 nextcloud 缓存
     refresh_cmd = ['sudo', '-u', 'www-data', 'php', config['occ_path'],
                    'files:scan', '--path=%s' % config['refresh_target']]
