@@ -167,9 +167,9 @@ def do_download():
     # 判断内容是否发布
     # 存在仅更新一个页面，没有具体内容的情况
     tmp_rsp = requests.get(big_link, headers=my_headers)
-    log_debug(tmp_rsp.content)
     if re.search("共\d*页", tmp_rsp.content.decode("GB18030")) is None:
         log_info("今日报纸内容未发布，仅发布一个空页面")
+        log_debug(tmp_rsp.content)
         return
 
     download_and_save(big_link, 1)
